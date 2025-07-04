@@ -1,71 +1,70 @@
 document.addEventListener('DOMContentLoaded', function() {
 
 	const referrer = document.referrer;
-	let refDomain = '';
+let refDomain = '';
 
-	if (referrer) {
-		try {
-			const parsedReferrer = new URL(referrer);
-			refDomain = parsedReferrer.hostname;
-		} catch (e) {
-			console.error("Error parsing referrer:", e);
+if (referrer) {
+	try {
+		const parsedReferrer = new URL(referrer);
+		refDomain = parsedReferrer.hostname;
+	} catch (e) {
+		console.error("Error parsing referrer:", e);
+	}
+}
+
+const domain = location.hostname;
+const domainList = ['google.com', 'ocefo.com', 'buytostore.com', domain];
+const domainPattern = new RegExp('(?:www\\.)?(' + domainList.map(d => d.replace(/\./g, '\\.')).join('|') + ')$');
+const effectiveDomain = domainPattern.test(refDomain) ? domain : (refDomain || domain);
+
+// Ambil query string
+const query = decodeURIComponent(window.location.search.slice(1)); // hilangkan "?" dan decode
+
+// Pisahkan slug dan suffix (hash 5 karakter di akhir)
+const match = query.match(/^(.*)-([a-zA-Z0-9]{5})$/);
+if (!match) {
+	console.warn("Format ID tidak valid:", query);
+	return;
+}
+
+const slug = match[1];
+const suffix = match[2];
+
+// Fungsi hash yang konsisten
+function generateId(domain, lang, slug, length = 5) {
+	const seed = `${domain}|${lang}|${slug}`;
+	let hash = 0;
+	for (let i = 0; i < seed.length; i++) {
+		hash = (hash << 5) - hash + seed.charCodeAt(i);
+		hash |= 0; // jaga 32-bit
+	}
+	const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+	let result = '';
+	let value = Math.abs(hash);
+	while (result.length < length) {
+		result += chars[value % chars.length];
+		value = Math.floor(value / chars.length);
+	}
+	return result;
+}
+
+// Fungsi deteksi bahasa
+function detectLang(domain, slug, idSuffix) {
+	const possibleLangs = ['ko', 'en', 'ja', 'fr', 'es', 'pt', 'it', 'th', 'ar', 'pl', 'de'];
+	for (let l of possibleLangs) {
+		if (generateId(domain, l, slug) === idSuffix) {
+			return l;
 		}
 	}
+	return null;
+}
 
-	const domain = location.hostname;
-	const domainList = ['google.com', 'ocefo.com', 'buytostore.com', domain];
-	const domainPattern = new RegExp('(?:www\\.)?(' + domainList.map(d => d.replace(/\./g, '\\.')).join('|') + ')$');
-
-	// Tentukan domain yang efektif (asli atau referer)
-	const effectiveDomain = domainPattern.test(refDomain) ? domain : (refDomain || domain);
-	const subdomain = domain.split('.')[0];
-
-	// Ambil string query setelah tanda '?'
-	let query = window.location.search.slice(1);
-	if (!query) {
-		console.warn("Query kosong di URL");
-		return;
-	}
-
-	// Pisahkan slug dan ID hash
-	const parts = query.split("-");
-	const suffix = parts.pop();        // bagian hash: misalnya "Xt9f4"
-	const slug = parts.join("-");      // bagian slug asli: misalnya "meja-kopi-modern"
-	let lang = null;
-
-	// Fungsi hashing untuk validasi ulang
-	function generateId(domain, lang, slug, length = 5) {
-		const seed = `${domain}|${lang}|${slug}`;
-		let hash = 0;
-		for (let i = 0; i < seed.length; i++) {
-			hash = (hash << 5) - hash + seed.charCodeAt(i);
-			hash |= 0;
-		}
-		const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-		let result = '';
-		let value = Math.abs(hash);
-		while (result.length < length) {
-			result += chars[value % chars.length];
-			value = Math.floor(value / chars.length);
-		}
-		return result;
-	}
-
-	// Deteksi bahasa dari ID suffix
-	function detectLang(domain, slug, idSuffix) {
-		const possibleLangs = ['ko', 'en', 'ja', 'fr', 'es', 'pt', 'it', 'th', 'ar', 'pl', 'de'];
-		for (let l of possibleLangs) {
-			if (generateId(domain, l, slug) === idSuffix) return l;
-		}
-		return null;
-	}
-
-	lang = detectLang(effectiveDomain, slug, suffix);
-
-	if (!lang) {
-		console.warn("Gagal mendeteksi bahasa dari ID:", suffix);
-		return;
-	}
+// Deteksi bahasa
+const lang = detectLang(effectiveDomain, slug, suffix);
+if (!lang) {
+	console.warn("Gagal mendeteksi bahasa dari ID:", suffix);
+	return;
+}
 
 	// Gunakan nilai-nilai ini sesuai kebutuhan
 	console.log("✔️ Deteksi berhasil:");
